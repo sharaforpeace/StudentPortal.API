@@ -1,9 +1,11 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using StudentPortal.API.DomainModels;
 using StudentPortal.API.Repositories;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -13,11 +15,13 @@ namespace StudentPortal.API.Controllers
     {
         private readonly IStudentRepository studentRepository;
         private readonly IMapper mapper;
+        private readonly IImageRepository imageRepository;
 
-        public StudentsController(IStudentRepository studentRepository, IMapper mapper)
+        public StudentsController(IStudentRepository studentRepository, IMapper mapper, IImageRepository imageRepository)
         {
             this.studentRepository = studentRepository;
             this.mapper = mapper;
+            this.imageRepository = imageRepository;
         }
 
         [HttpGet]
@@ -57,7 +61,6 @@ namespace StudentPortal.API.Controllers
             return NotFound();
         }
 
-
         [HttpDelete]
         [Route("[controller]/{studentId:guid}")]
         public async Task<IActionResult> DeleteStudentAsync([FromRoute] Guid studentId)
@@ -79,6 +82,23 @@ namespace StudentPortal.API.Controllers
                 mapper.Map<Student>(student));
         }
 
+        [HttpPost]
+        [Route("[controller]/{studentId:guid}/upload-image")]
+        public async Task<IActionResult> UploadImage([FromRoute] Guid studentId, IFormFile profileImage)
+        {
+            if(await studentRepository.Exists(studentId))
+            {
+                // upload image to local repository
+                var fileName = Guid.NewGuid() + Path.GetExtension(profileImage.FileName);
+                var fileImagePath = await this.imageRepository.Upload(profileImage, fileName);
+               if(await studentRepository.UpdateProfileImage(studentId, fileImagePath))
+                {
+                    return Ok(fileImagePath);
+                }
+                return StatusCode(StatusCodes.Status500InternalServerError, "Error Uploading Image");
+            }
+            return NotFound();
+        }
     }
 }
 
